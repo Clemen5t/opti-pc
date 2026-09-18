@@ -35,7 +35,7 @@ public partial class MainWindow : Window
     }
 
     bool IsAdmin() => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
-    void Log(string s) { LogBox.AppendText($"[${DateTime.Now:HH:mm:ss}] ${s}\n"); LogBox.ScrollToEnd(); }
+    void Log(string s) { LogBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {s}\n"); LogBox.ScrollToEnd(); }
     void Status(string s, double p) { StatusText.Text = s; Progress.Value = Math.Clamp(p, 0, 100); }
     string SelectedProfile => (ProfileSelector.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Auto recommandé";
 
@@ -54,12 +54,12 @@ public partial class MainWindow : Window
             var os = Wmi("Win32_OperatingSystem", "Caption");
             var build = Wmi("Win32_OperatingSystem", "BuildNumber");
             var ram = Wmi("Win32_ComputerSystem", "TotalPhysicalMemory", true);
-            HardwareText.Text = $"CPU : ${cpu}\nGPU : ${gpu}\nRAM : ${ram}\nCarte mère : ${board}\nBIOS : ${bios}";
+            HardwareText.Text = $"CPU : {cpu}\nGPU : {gpu}\nRAM : {ram}\nCarte mère : {board}\nBIOS : {bios}";
 
             var hags = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode", null);
             var game = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\GameBar", "AutoGameModeEnabled", null);
             var dvr = Registry.GetValue(@"HKEY_CURRENT_USER\System\GameConfigStore", "GameDVR_Enabled", null);
-            WindowsText.Text = $"${os} (build ${build})\nGame Mode : ${RegState(game, 1)}\nHAGS : ${RegState(hags, 2)}\nCapture Game DVR : ${RegState(dvr, 1)}\nÉnergie : ${Clean(await Capture("powercfg", "/getactivescheme"))}";
+            WindowsText.Text = $"{os} (build {build})\nGame Mode : {RegState(game, 1)}\nHAGS : {RegState(hags, 2)}\nCapture Game DVR : {RegState(dvr, 1)}\nÉnergie : {Clean(await Capture("powercfg", "/getactivescheme"))}";
 
             Status("Analyse réseau...", 40);
             var nic = PrimaryNic();
@@ -69,11 +69,11 @@ public partial class MainWindow : Window
                 var gw = ip.GatewayAddresses.FirstOrDefault()?.Address?.ToString() ?? "aucune";
                 var dns = string.Join(", ", ip.DnsAddresses.Select(x => x.ToString()));
                 var q = PQ(nic.Name);
-                var d = await PSC($"Get-NetAdapter -Name ${q}|Select Name,InterfaceDescription,DriverVersion,DriverDate,LinkSpeed|Format-List|Out-String");
-                var rss = await PSC($"Get-NetAdapterRss -Name ${q} -ErrorAction SilentlyContinue|Select Enabled,Profile,NumberOfReceiveQueues|Format-List|Out-String");
-                var rsc = await PSC($"Get-NetAdapterRsc -Name ${q} -ErrorAction SilentlyContinue|Select IPv4Enabled,IPv6Enabled|Format-List|Out-String");
-                NetworkText.Text = $"${nic.Name} (${nic.NetworkInterfaceType})\nLien : ${nic.Speed / 1_000_000d:0} Mb/s\nPasserelle : ${gw}\nDNS : ${dns}\n${Clean(d)}\n${Clean(rss)}\n${Clean(rsc)}";
-                AdvancedNetworkBox.Text = await PSC($"Get-NetAdapterAdvancedProperty -Name ${q} -ErrorAction SilentlyContinue | Select DisplayName,DisplayValue,RegistryKeyword,RegistryValue | Format-Table -Wrap -AutoSize | Out-String");
+                var d = await PSC($"Get-NetAdapter -Name {q}|Select Name,InterfaceDescription,DriverVersion,DriverDate,LinkSpeed|Format-List|Out-String");
+                var rss = await PSC($"Get-NetAdapterRss -Name {q} -ErrorAction SilentlyContinue|Select Enabled,Profile,NumberOfReceiveQueues|Format-List|Out-String");
+                var rsc = await PSC($"Get-NetAdapterRsc -Name {q} -ErrorAction SilentlyContinue|Select IPv4Enabled,IPv6Enabled|Format-List|Out-String");
+                NetworkText.Text = $"{nic.Name} ({nic.NetworkInterfaceType})\nLien : {nic.Speed / 1_000_000d:0} Mb/s\nPasserelle : {gw}\nDNS : {dns}\n{Clean(d)}\n{Clean(rss)}\n{Clean(rsc)}";
+                AdvancedNetworkBox.Text = await PSC($"Get-NetAdapterAdvancedProperty -Name {q} -ErrorAction SilentlyContinue | Select DisplayName,DisplayValue,RegistryKeyword,RegistryValue | Format-Table -Wrap -AutoSize | Out-String");
             }
             else
             {
@@ -98,7 +98,7 @@ public partial class MainWindow : Window
         var gpu = VideoDrivers();
         var chipset = Clean(await PSC(@"Get-CimInstance Win32_PnPSignedDriver | Where-Object {$_.DeviceName -match 'AMD.*(SMBus|GPIO|PSP|PCI)'} | Sort DriverDate -Descending | Select -First 8 DeviceName,DriverVersion,DriverDate | Format-Table -AutoSize | Out-String"));
         var net = Clean(await PSC(@"Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Select Name,InterfaceDescription,DriverVersion,DriverDate | Format-Table -AutoSize | Out-String"));
-        return $"GPU :\n${gpu}\n\nChipset AMD :\n${chipset}\n\nRéseau :\n${net}";
+        return $"GPU :\n{gpu}\n\nChipset AMD :\n{chipset}\n\nRéseau :\n{net}";
     }
 
     private async void Optimize_Click(object s, RoutedEventArgs e)
@@ -125,8 +125,8 @@ public partial class MainWindow : Window
             Status("Benchmark APRÈS...", 80);
             var after = await BenchmarkAsync("APRÈS", 32);
 
-            ProfileText.Text = $"${SelectedProfile}\nGame Mode activé ; plan Équilibré ; RSS activé ; TCP Auto-Tuning Normal.\n${rscDecision}\nDefender, pare-feu, Windows Update, IPv6, PBO/CO et mitigations de sécurité laissés intacts.";
-            var report = $"Opti-PC v0.3 — ${DateTime.Now:yyyy-MM-dd HH:mm}\nProfil : ${SelectedProfile}\n\nAVANT\n${before}\nAPRÈS\n${after}\nDécision RSC : ${rscDecision}\n";
+            ProfileText.Text = $"{SelectedProfile}\nGame Mode activé ; plan Équilibré ; RSS activé ; TCP Auto-Tuning Normal.\n{rscDecision}\nDefender, pare-feu, Windows Update, IPv6, PBO/CO et mitigations de sécurité laissés intacts.";
+            var report = $"Opti-PC v0.3 — {DateTime.Now:yyyy-MM-dd HH:mm}\nProfil : {SelectedProfile}\n\nAVANT\n{before}\nAPRÈS\n{after}\nDécision RSC : {rscDecision}\n";
             await File.WriteAllTextAsync(ReportPath, report);
 
             await AnalyzeAsync();
@@ -160,9 +160,9 @@ public partial class MainWindow : Window
         var nic = PrimaryNic();
         if (nic == null) return;
         var q = PQ(nic.Name);
-        await PS($"try{{Enable-NetAdapterRss -Name ${q} -ErrorAction Stop}}catch{{}}");
-        await PS($"try{{Set-NetAdapterPowerManagement -Name ${q} -AllowComputerToTurnOffDevice Disabled -ErrorAction Stop}}catch{{}}");
-        Log($"RSS activé et économie d'énergie de l'interface réduite sur ${nic.Name} si supporté.");
+        await PS($"try{{Enable-NetAdapterRss -Name {q} -ErrorAction Stop}}catch{{}}");
+        await PS($"try{{Set-NetAdapterPowerManagement -Name {q} -AllowComputerToTurnOffDevice Disabled -ErrorAction Stop}}catch{{}}");
+        Log($"RSS activé et économie d'énergie de l'interface réduite sur {nic.Name} si supporté.");
     }
 
     async Task<string> OptimizeRscByMeasurementAsync()
@@ -170,12 +170,12 @@ public partial class MainWindow : Window
         var nic = PrimaryNic();
         if (nic == null) return "RSC non testé : aucune interface active.";
         var q = PQ(nic.Name);
-        var current = Clean(await PSC($"$r=Get-NetAdapterRsc -Name ${q} -ErrorAction SilentlyContinue;if($null -eq $r){{'UNSUPPORTED'}}else{{[string]$r.IPv4Enabled+'|'+[string]$r.IPv6Enabled}}"));
+        var current = Clean(await PSC($"$r=Get-NetAdapterRsc -Name {q} -ErrorAction SilentlyContinue;if($null -eq $r){{'UNSUPPORTED'}}else{{[string]$r.IPv4Enabled+'|'+[string]$r.IPv6Enabled}}"));
         if (current.Contains("UNSUPPORTED")) return "RSC non supporté par cette interface.";
 
         var target = nic.GetIPProperties().GatewayAddresses.FirstOrDefault()?.Address?.ToString() ?? "1.1.1.1";
         var initial = await PingStats(target, 34);
-        await PS($"try{{Disable-NetAdapterRsc -Name ${q} -IPv4 -IPv6 -Confirm:$false -ErrorAction Stop}}catch{{}}");
+        await PS($"try{{Disable-NetAdapterRsc -Name {q} -IPv4 -IPv6 -Confirm:$false -ErrorAction Stop}}catch{{}}");
         await Task.Delay(1200);
         var off = await PingStats(target, 34);
 
@@ -190,13 +190,13 @@ public partial class MainWindow : Window
         {
             var v4 = wasV4 ? "$true" : "$false";
             var v6 = wasV6 ? "$true" : "$false";
-            await PS($"try{{Set-NetAdapterRsc -Name ${q} -IPv4Enabled ${v4} -IPv6Enabled ${v6} -Confirm:$false -ErrorAction Stop}}catch{{}}");
-            Log($"RSC restauré : test OFF non concluant. Score initial ${initial.Score:0.0}, OFF ${off.Score:0.0}.");
-            return $"RSC conservé/restauré selon l'état initial (score ${initial.Score:0.0} vs OFF ${off.Score:0.0}).";
+            await PS($"try{{Set-NetAdapterRsc -Name {q} -IPv4Enabled {v4} -IPv6Enabled {v6} -Confirm:$false -ErrorAction Stop}}catch{{}}");
+            Log($"RSC restauré : test OFF non concluant. Score initial {initial.Score:0.0}, OFF {off.Score:0.0}.");
+            return $"RSC conservé/restauré selon l'état initial (score {initial.Score:0.0} vs OFF {off.Score:0.0}).";
         }
 
-        Log($"RSC OFF conservé : score ${initial.Score:0.0} → ${off.Score:0.0}.");
-        return $"RSC désactivé après test A/B (score ${initial.Score:0.0} → ${off.Score:0.0}).";
+        Log($"RSC OFF conservé : score {initial.Score:0.0} → {off.Score:0.0}.");
+        return $"RSC désactivé après test A/B (score {initial.Score:0.0} → {off.Score:0.0}).";
     }
 
     async Task ApplyNicVendorSafeTweaksAsync()
@@ -205,11 +205,11 @@ public partial class MainWindow : Window
         if (nic == null) return;
         var q = PQ(nic.Name);
         var script =
-            $"$p=Get-NetAdapterAdvancedProperty -Name ${q} -ErrorAction SilentlyContinue;" +
+            $"$p=Get-NetAdapterAdvancedProperty -Name {q} -ErrorAction SilentlyContinue;" +
             "$targets=$p|Where-Object {$_.DisplayName -match 'Energy.Efficient|Green Ethernet|Gigabit Lite|Power Saving|Économie.*énergie'};" +
             "foreach($x in $targets){try{" +
-            $"if($x.ValidDisplayValues -contains 'Disabled'){{Set-NetAdapterAdvancedProperty -Name ${q} -RegistryKeyword $x.RegistryKeyword -DisplayValue 'Disabled' -NoRestart -ErrorAction Stop}}" +
-            $"elseif($x.ValidDisplayValues -contains 'Désactivé'){{Set-NetAdapterAdvancedProperty -Name ${q} -RegistryKeyword $x.RegistryKeyword -DisplayValue 'Désactivé' -NoRestart -ErrorAction Stop}}" +
+            $"if($x.ValidDisplayValues -contains 'Disabled'){{Set-NetAdapterAdvancedProperty -Name {q} -RegistryKeyword $x.RegistryKeyword -DisplayValue 'Disabled' -NoRestart -ErrorAction Stop}}" +
+            $"elseif($x.ValidDisplayValues -contains 'Désactivé'){{Set-NetAdapterAdvancedProperty -Name {q} -RegistryKeyword $x.RegistryKeyword -DisplayValue 'Désactivé' -NoRestart -ErrorAction Stop}}" +
             "}catch{}}";
         await PS(script);
 
@@ -263,7 +263,7 @@ $b|ConvertTo-Json -Depth 12";
             Status("Restauration...", 20);
             var path = PSQ(BackupPath);
             var script = $@"
-$b=Get-Content -Raw ${path}|ConvertFrom-Json
+$b=Get-Content -Raw {path}|ConvertFrom-Json
 if($b.Power -match '[0-9a-fA-F-]{{36}}'){{powercfg /setactive $Matches[0]|Out-Null}}
 if($null -eq $b.HwSchMode){{Remove-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' HwSchMode -ErrorAction SilentlyContinue}}
 else{{Set-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' HwSchMode ([int]$b.HwSchMode) -Type DWord -Force}}
@@ -295,7 +295,7 @@ foreach($a in $b.Adapters){{
 
     async Task<string> BenchmarkAsync(string label, int count)
     {
-        BenchmarkBox.AppendText($"===== ${label} — ${DateTime.Now:HH:mm:ss} =====\n");
+        BenchmarkBox.AppendText($"===== {label} — {DateTime.Now:HH:mm:ss} =====\n");
         var targets = new List<string>();
         var nic = PrimaryNic();
         var gw = nic?.GetIPProperties().GatewayAddresses.FirstOrDefault()?.Address?.ToString();
@@ -306,7 +306,7 @@ foreach($a in $b.Adapters){{
         foreach (var target in targets.Distinct())
         {
             var r = await PingStats(target, count);
-            var line = $"${target,-16} moyenne ${r.Avg,6:0.0} ms | min ${r.Min,4} | max ${r.Max,4} | jitter ${r.Jitter,5:0.0} ms | pertes ${r.Loss,5:0.0}% | score ${r.Score,6:0.0}";
+            var line = $"{target,-16} moyenne {r.Avg,6:0.0} ms | min {r.Min,4} | max {r.Max,4} | jitter {r.Jitter,5:0.0} ms | pertes {r.Loss,5:0.0}% | score {r.Score,6:0.0}";
             sb.AppendLine(line);
             BenchmarkBox.AppendText(line + "\n");
         }
@@ -314,7 +314,7 @@ foreach($a in $b.Adapters){{
         var sw = Stopwatch.StartNew();
         try { await Dns.GetHostAddressesAsync("www.microsoft.com"); } catch { }
         sw.Stop();
-        var dns = $"Résolution DNS indicative : ${sw.Elapsed.TotalMilliseconds:0.0} ms (pas le ping du jeu).";
+        var dns = $"Résolution DNS indicative : {sw.Elapsed.TotalMilliseconds:0.0} ms (pas le ping du jeu).";
         sb.AppendLine(dns);
         BenchmarkBox.AppendText(dns + "\n\n");
         BenchmarkBox.ScrollToEnd();
@@ -346,12 +346,12 @@ foreach($a in $b.Adapters){{
 
     string Wmi(string c, string p, bool gb = false)
     {
-        using var s = new ManagementObjectSearcher($"SELECT ${p} FROM ${c}");
+        using var s = new ManagementObjectSearcher($"SELECT {p} FROM {c}");
         foreach (ManagementObject o in s.Get())
         {
             var v = o[p];
             if (v == null) continue;
-            if (gb && ulong.TryParse(v.ToString(), out var b)) return $"${b / 1073741824d:0.0} Go";
+            if (gb && ulong.TryParse(v.ToString(), out var b)) return $"{b / 1073741824d:0.0} Go";
             return v.ToString() ?? "Inconnu";
         }
         return "Inconnu";
@@ -360,16 +360,16 @@ foreach($a in $b.Adapters){{
     string VideoDrivers()
     {
         using var s = new ManagementObjectSearcher("SELECT Name,DriverVersion,DriverDate FROM Win32_VideoController");
-        return string.Join("\n", s.Get().Cast<ManagementObject>().Select(o => $"${o["Name"]} — ${o["DriverVersion"]} — ${o["DriverDate"]}"));
+        return string.Join("\n", s.Get().Cast<ManagementObject>().Select(o => $"{o["Name"]} — {o["DriverVersion"]} — {o["DriverDate"]}"));
     }
 
     static string PQ(string s) => "'" + s.Replace("'", "''") + "'";
     static string PSQ(string s) => "'" + s.Replace("'", "''") + "'";
     static string Clean(string s) => Regex.Replace(s ?? "", @"\r?\n\s*\r?\n", "\n").Trim();
-    static string RegState(object? v, int on) => v is int i ? (i == on ? "Activé" : i == 0 ? "Désactivé" : $"Valeur ${i}") : "Non défini";
+    static string RegState(object? v, int on) => v is int i ? (i == on ? "Activé" : i == 0 ? "Désactivé" : $"Valeur {i}") : "Non défini";
 
-    async Task PS(string script) { var e = Convert.ToBase64String(Encoding.Unicode.GetBytes(script)); await Run("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand ${e}"); }
-    async Task<string> PSC(string script) { var e = Convert.ToBase64String(Encoding.Unicode.GetBytes(script)); return await Capture("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand ${e}"); }
+    async Task PS(string script) { var e = Convert.ToBase64String(Encoding.Unicode.GetBytes(script)); await Run("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {e}"); }
+    async Task<string> PSC(string script) { var e = Convert.ToBase64String(Encoding.Unicode.GetBytes(script)); return await Capture("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {e}"); }
     async Task Run(string f, string a) { var (_, err, c) = await Exec(f, a); if (c != 0 && !string.IsNullOrWhiteSpace(err)) throw new Exception(err.Trim()); }
     async Task<string> Capture(string f, string a) { var (o, err, c) = await Exec(f, a); if (c != 0 && !string.IsNullOrWhiteSpace(err)) throw new Exception(err.Trim()); return o; }
 
