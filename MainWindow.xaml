@@ -11,7 +11,7 @@
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <Grid>
             <StackPanel><TextBlock Text="Opti-PC" FontSize="32" FontWeight="Bold"/><TextBlock Text="Windows 11 • Ryzen X3D • Radeon RX 7000 • optimisation mesurée et réversible" Opacity=".72"/></StackPanel>
-            <StackPanel HorizontalAlignment="Right"><TextBlock Text="v0.4" FontWeight="Bold" HorizontalAlignment="Right"/><TextBlock x:Name="AdminText" Text="Administrateur" Opacity=".65"/></StackPanel>
+            <StackPanel HorizontalAlignment="Right"><TextBlock Text="v0.4.1" FontWeight="Bold" HorizontalAlignment="Right"/><TextBlock x:Name="AdminText" Text="Administrateur" Opacity=".65"/></StackPanel>
         </Grid>
         <Grid Grid.Row="1" Margin="0,18,0,14">
             <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
