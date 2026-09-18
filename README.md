@@ -1,26 +1,23 @@
-# Opti-PC
+# Opti-PC v0.2
 
-Application Windows 11 pour optimiser automatiquement un PC gaming AMD, avec priorité à la stabilité, la latence et la réversibilité.
+Optimiseur Windows 11 local, mesurable et réversible pour Ryzen 7 7800X3D + Radeon RX 7900 XT, avec prise en charge du Realtek 8125BG 2.5 GbE de la MSI B650 Gaming Plus WiFi.
 
-Configuration cible principale :
-- AMD Ryzen 7 7800X3D
-- AMD Radeon RX 7900 XT
-- Windows 11
+## OPTIMISER TOUT
+- benchmark réseau avant/après : passerelle + 1.1.1.1 + 8.8.8.8, ping/jitter/pertes
+- sauvegarde des paramètres et demande d'un point de restauration Windows
+- Game Mode + HAGS
+- plan Équilibré (pas d'Ultimate Performance forcé sur X3D)
+- RSS activé ; TCP Auto-Tuning conservé sur Normal
+- RSC désactivé sur l'interface active pour le profil faible latence
+- économie d'énergie NIC réduite si supportée
+- EEE / Green Ethernet désactivé uniquement si le pilote expose réellement le réglage
+- cache DNS vidé, sans imposer de DNS tiers
+- analyse pilotes GPU/chipset/réseau, BIOS, logiciels au démarrage
+- rapport dans `%ProgramData%\OptiPC\last-report.txt`
+- restauration depuis `%ProgramData%\OptiPC\backup.json`
 
-## Principes
-- sauvegarde avant modification
-- rollback complet
-- aucun tweak registre obscur
-- aucun désactivation Defender / pare-feu / Windows Update
-- aucun overclock / undervolt automatique
-- réglages réseau appliqués uniquement si pris en charge
+## Ce qui n'est volontairement pas automatisé
+Defender, pare-feu, Windows Update, IPv6 et mitigations restent actifs. Pas de tweaks HPET/timer/Nagle/NetworkThrottlingIndex. Aucun overclock/undervolt automatique. PBO, Curve Optimizer, EXPO, BIOS et pilotes optionnels demandent une validation et des tests de stabilité.
 
-## Utilisation
-Lancer l'application en administrateur puis utiliser :
-- Analyser
-- Optimiser automatiquement
-- Tester le réseau
-- Restaurer
-
-## Développement
-.NET 8 / WPF
+## EXE
+GitHub Actions construit un EXE Windows x64 autonome. Ouvre **Actions > build** puis télécharge l'artifact **OptiPC-win-x64**.
