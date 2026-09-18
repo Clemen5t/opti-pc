@@ -4,6 +4,10 @@ using System.Management;
 using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Http;
+using System.IO.Compression;
+using System.Reflection;
+using System.Text.Json;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -14,6 +18,8 @@ namespace OptiPC;
 
 public partial class MainWindow : Window
 {
+    static readonly HttpClient http = new() { Timeout = TimeSpan.FromMinutes(5) };
+    const string RepoApi = "https://api.github.com/repos/Clemen5t/opti-pc";
     readonly string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "OptiPC");
     string BackupPath => Path.Combine(dataDir, "backup.json");
     string ReportPath => Path.Combine(dataDir, "last-report.txt");
@@ -26,11 +32,13 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("OptiPC-Updater/0.4");
         Directory.CreateDirectory(dataDir);
         Loaded += async (_, _) =>
         {
             AdminText.Text = IsAdmin() ? "Administrateur ✓" : "Administrateur requis";
             await AnalyzeAsync();
+            _ = CheckUpdateOnStartupAsync();
         };
     }
 
@@ -41,6 +49,144 @@ public partial class MainWindow : Window
 
     private async void Analyze_Click(object s, RoutedEventArgs e) => await AnalyzeAsync();
     private async void Benchmark_Click(object s, RoutedEventArgs e) => await BenchmarkAsync("MANUEL", 24);
+
+    private async void Update_Click(object s, RoutedEventArgs e)
+    {
+        await CheckAndInstallUpdateAsync(true);
+    }
+
+    async Task CheckUpdateOnStartupAsync()
+    {
+        try { await CheckAndInstallUpdateAsync(false); } catch { }
+    }
+
+    Version CurrentVersion() => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0);
+
+    async Task<(Version version, string sha)?> GetRemoteVersionAsync()
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, RepoApi + "/contents/OptiPC.csproj");
+        req.Headers.Accept.ParseAdd("application/vnd.github+json");
+        using var res = await http.SendAsync(req);
+        res.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        var root = doc.RootElement;
+        var encoded = root.GetProperty("content").GetString()?.Replace("\n", "") ?? "";
+        var project = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+        var match = Regex.Match(project, @"<Version>([^<]+)</Version>");
+        if (!match.Success || !Version.TryParse(match.Groups[1].Value.Trim(), out var version)) return null;
+        return (version, root.GetProperty("sha").GetString() ?? "");
+    }
+
+    async Task CheckAndInstallUpdateAsync(bool interactive)
+    {
+        try
+        {
+            Status("Recherche de mise à jour...", 10);
+            var remote = await GetRemoteVersionAsync();
+            if (remote == null) throw new Exception("Version distante introuvable.");
+
+            var current = CurrentVersion();
+            if (remote.Value.version <= current)
+            {
+                Status("Application à jour.", 100);
+                if (interactive) MessageBox.Show($"Opti-PC est déjà à jour.\nVersion installée : {current.ToString(3)}", "Mise à jour");
+                return;
+            }
+
+            if (!interactive)
+            {
+                Status($"Mise à jour {remote.Value.version} disponible.", 100);
+                Log($"Nouvelle version disponible : {current.ToString(3)} → {remote.Value.version}.");
+                return;
+            }
+
+            var answer = MessageBox.Show(
+                $"Une nouvelle version est disponible.\n\n{current.ToString(3)} → {remote.Value.version}\n\nOpti-PC va télécharger la dernière compilation GitHub, remplacer l'EXE puis redémarrer automatiquement.\n\nContinuer ?",
+                "Mise à jour Opti-PC", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (answer != MessageBoxResult.Yes) { Status("Mise à jour annulée.", 0); return; }
+
+            await InstallLatestArtifactAsync(remote.Value.version);
+        }
+        catch (Exception ex)
+        {
+            Log("ERREUR mise à jour : " + ex.Message);
+            Status("Échec de la mise à jour.", 0);
+            if (interactive) MessageBox.Show("Impossible d'effectuer la mise à jour automatiquement.\n\n" + ex.Message, "Mise à jour", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    async Task InstallLatestArtifactAsync(Version targetVersion)
+    {
+        Status("Recherche du build validé...", 20);
+        var runsJson = await http.GetStringAsync(RepoApi + "/actions/workflows/build.yml/runs?branch=main&status=success&per_page=20");
+        using var runsDoc = JsonDocument.Parse(runsJson);
+        JsonElement? selected = null;
+        foreach (var run in runsDoc.RootElement.GetProperty("workflow_runs").EnumerateArray())
+        {
+            if (run.GetProperty("event").GetString() != "push") continue;
+            selected = run;
+            break;
+        }
+        if (selected == null) throw new Exception("Aucun build GitHub validé n'est disponible.");
+
+        var runId = selected.Value.GetProperty("id").GetInt64();
+        var artifactsJson = await http.GetStringAsync($"{RepoApi}/actions/runs/{runId}/artifacts");
+        using var artDoc = JsonDocument.Parse(artifactsJson);
+        JsonElement? artifact = null;
+        foreach (var a in artDoc.RootElement.GetProperty("artifacts").EnumerateArray())
+        {
+            if (a.GetProperty("name").GetString() == "OptiPC-win-x64" && !a.GetProperty("expired").GetBoolean()) { artifact = a; break; }
+        }
+        if (artifact == null) throw new Exception("Artefact OptiPC-win-x64 introuvable.");
+
+        var artifactId = artifact.Value.GetProperty("id").GetInt64();
+        var tempRoot = Path.Combine(Path.GetTempPath(), "OptiPC-Update-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        var zipPath = Path.Combine(tempRoot, "update.zip");
+
+        Status("Téléchargement de la mise à jour...", 45);
+        using (var response = await http.GetAsync($"{RepoApi}/actions/artifacts/{artifactId}/zip", HttpCompletionOption.ResponseHeadersRead))
+        {
+            response.EnsureSuccessStatusCode();
+            await using var input = await response.Content.ReadAsStreamAsync();
+            await using var output = File.Create(zipPath);
+            await input.CopyToAsync(output);
+        }
+
+        Status("Vérification...", 65);
+        var extract = Path.Combine(tempRoot, "files");
+        ZipFile.ExtractToDirectory(zipPath, extract);
+        var newExe = Directory.GetFiles(extract, "OptiPC.exe", SearchOption.AllDirectories).FirstOrDefault();
+        if (newExe == null) throw new Exception("Le nouvel exécutable est absent de l'artefact.");
+
+        var currentExe = Environment.ProcessPath ?? throw new Exception("Chemin de l'application introuvable.");
+        var stagedExe = Path.Combine(Path.GetDirectoryName(currentExe)!, "OptiPC.update.exe");
+        File.Copy(newExe, stagedExe, true);
+
+        var updater = Path.Combine(tempRoot, "apply-update.cmd");
+        var log = Path.Combine(dataDir, "update.log");
+        var cmd =
+            "@echo off\r\n" +
+            "setlocal\r\n" +
+            $"set \"PID={Environment.ProcessId}\"\r\n" +
+            $"set \"CURRENT={currentExe}\"\r\n" +
+            $"set \"NEW={stagedExe}\"\r\n" +
+            $"set \"LOG={log}\"\r\n" +
+            ":wait\r\n" +
+            "tasklist /FI \"PID eq %PID%\" 2>NUL | find \"%PID%\" >NUL\r\n" +
+            "if not errorlevel 1 (timeout /t 1 /nobreak >NUL & goto wait)\r\n" +
+            "copy /Y \"%CURRENT%\" \"%CURRENT%.old\" >NUL\r\n" +
+            "move /Y \"%NEW%\" \"%CURRENT%\" >NUL\r\n" +
+            "if errorlevel 1 (copy /Y \"%CURRENT%.old\" \"%CURRENT%\" >NUL & echo Update failed>%LOG% & exit /b 1)\r\n" +
+            "echo Update installed>%LOG%\r\n" +
+            "start \"\" \"%CURRENT%\"\r\n" +
+            "exit /b 0\r\n";
+        await File.WriteAllTextAsync(updater, cmd, Encoding.ASCII);
+
+        Status($"Installation de {targetVersion}...", 85);
+        Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"{updater}\"") { UseShellExecute = true, WindowStyle = ProcessWindowStyle.Hidden });
+        Application.Current.Shutdown();
+    }
 
     async Task AnalyzeAsync()
     {
@@ -126,7 +272,7 @@ public partial class MainWindow : Window
             var after = await BenchmarkAsync("APRÈS", 32);
 
             ProfileText.Text = $"{SelectedProfile}\nGame Mode activé ; plan Équilibré ; RSS activé ; TCP Auto-Tuning Normal.\n{rscDecision}\nDefender, pare-feu, Windows Update, IPv6, PBO/CO et mitigations de sécurité laissés intacts.";
-            var report = $"Opti-PC v0.3 — {DateTime.Now:yyyy-MM-dd HH:mm}\nProfil : {SelectedProfile}\n\nAVANT\n{before}\nAPRÈS\n{after}\nDécision RSC : {rscDecision}\n";
+            var report = $"Opti-PC v0.4 — {DateTime.Now:yyyy-MM-dd HH:mm}\nProfil : {SelectedProfile}\n\nAVANT\n{before}\nAPRÈS\n{after}\nDécision RSC : {rscDecision}\n";
             await File.WriteAllTextAsync(ReportPath, report);
 
             await AnalyzeAsync();
