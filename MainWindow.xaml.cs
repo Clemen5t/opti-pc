@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.Management;
+using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Security.Principal;
